@@ -1,0 +1,31 @@
+﻿apiVersion: argoproj.io/v1alpha1
+kind: AnalysisRun
+metadata:
+  name: ccrg-ml-canary-gate-test
+spec:
+  metrics:
+    - name: canary-availability
+      interval: 5s
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] >= 1
+      provider:
+        prometheus:
+          address: http://host.docker.internal:9090
+          query: |
+            up{
+              job="smart-progressive-platform-kubernetes-canary"
+            }
+
+    - name: ml-deployment-success-probability
+      interval: 5s
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] >= 0.85
+      provider:
+        prometheus:
+          address: http://host.docker.internal:9090
+          query: |
+            ml_deployment_success_probability{
+              job="smart-progressive-platform-kubernetes-canary"
+            }

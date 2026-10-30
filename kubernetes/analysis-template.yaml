@@ -1,4 +1,4 @@
-apiVersion: argoproj.io/v1alpha1
+﻿apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:
   name: ccrg-canary-availability
@@ -14,5 +14,18 @@ spec:
           address: http://host.docker.internal:9090
           query: |
             up{
+              job="smart-progressive-platform-kubernetes-canary"
+            }
+
+    - name: ml-deployment-success-probability
+      interval: 5s
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] >= 0.85
+      provider:
+        prometheus:
+          address: http://host.docker.internal:9090
+          query: |
+            ml_deployment_success_probability{
               job="smart-progressive-platform-kubernetes-canary"
             }

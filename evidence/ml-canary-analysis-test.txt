@@ -1,0 +1,25 @@
+﻿SMART PROGRESSIVE DEPLOYMENT PLATFORM
+ML-BASED CANARY ANALYSIS VERIFICATION
+Date: 30 October 2026
+
+1. Prometheus Canary Availability: 1 (SUCCESSFUL)
+2. ML Deployment Success Probability: 0.79
+3. Required ML Threshold: 0.85
+4. ML Analysis Result: FAILED (expected rejection)
+5. Failure Reason: ML metric failed twice, exceeding failureLimit 1.
+6. Live Argo Rollout: HEALTHY
+7. Stable Revision: 7
+8. Stable Image: ccrg-platform:v5
+9. Ready Replicas: 5/5
+10. Pod Restarts: 0
+
+Conclusion:
+The standalone Argo AnalysisRun successfully evaluated the canary
+availability and ML probability metrics. The ML gate rejected the
+0.79 probability because it was below 0.85. The existing live
+Kubernetes rollout remained healthy and unchanged.
+
+Limitation:
+This test was a standalone AnalysisRun. A new live rollout using
+the updated AnalysisTemplate has not yet been tested.
+Kubernetes rollback execution remains disabled pending approval.
