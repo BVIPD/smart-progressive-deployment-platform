@@ -27,24 +27,7 @@
 [Limitations](#11-limitations-and-production-considerations)
 
 </div>
-
 ---
-
-## Project Information
-
-| | |
-|---|---|
-| **Project title** | Smart Progressive Deployment Platform |
-| **Project type** | Final Year Capstone Project |
-| **Team** | BVIPD Project Team |
-| **Institution** | *Your institution name* |
-| **Department / Program** | *Your department and program* |
-| **Supervisor** | *Supervisor name* |
-| **Academic year** | *e.g. 2025 – 2026* |
-| **Repository** | https://github.com/BVIPD/smart-progressive-deployment-platform |
-
----
-
 ## Table of Contents
 
 1. [Overview](#1-overview)
@@ -465,29 +448,7 @@ Before production use:
 - Helm chart for one-command installation
 - Model monitoring and drift detection
 
----
 
-## 13. Authors and Acknowledgements
-
-**BVIPD Project Team**
-
-| Name | Role | Contact |
-|---|---|---|
-| *Member name* | *e.g. Backend and ML* | *GitHub / email* |
-| *Member name* | *e.g. DevOps and Kubernetes* | *GitHub / email* |
-| *Member name* | *e.g. Monitoring and testing* | *GitHub / email* |
-
-**Supervisor:** *Supervisor name, designation*
-
-**Acknowledgements:** We thank our supervisor, our department, and the open-source communities behind FastAPI, Kubernetes, Argo Rollouts, Istio, Prometheus, Grafana, and scikit-learn.
-
----
-
-## 14. License
-
-*Specify a license here (for example MIT) and add a matching `LICENSE` file to the repository.*
-
----
 
 <div align="center">
 
