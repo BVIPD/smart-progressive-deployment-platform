@@ -20,7 +20,7 @@ def run_kubectl(arguments):
         if result.returncode != 0:
             return {
                 "success": False,
-                "error": result.stderr.strip()
+                "error": result.stderr.strip() or result.stdout.strip()
             }
 
         return {
@@ -70,7 +70,7 @@ def get_rollout_status():
             "conditions": status.get("conditions", [])
         }
 
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         return {
             "success": False,
             "error": "Unable to parse rollout JSON"
@@ -120,11 +120,13 @@ def get_revision_inventory():
                 .get("containers", [])
             )
 
+            revision = annotations.get(
+                "rollout.argoproj.io/revision"
+            )
+
             revisions.append({
                 "name": metadata.get("name"),
-                "revision": annotations.get(
-                    "rollout.argoproj.io/revision"
-                ),
+                "revision": revision,
                 "hash": labels.get(
                     "rollouts-pod-template-hash"
                 ),
@@ -178,7 +180,11 @@ def get_revision_inventory():
 
 
 def validate_rollback_target(revision):
-    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
+    if (
+        isinstance(revision, bool)
+        or not isinstance(revision, int)
+        or revision < 1
+    ):
         return {
             "success": False,
             "eligible": False,
@@ -259,8 +265,50 @@ def promote_rollout():
     }
 
 
-def rollback_rollout(revision):
+def rollback_rollout(revision, expected_hash=None):
+    """
+    Execute rollback only after the caller has verified human approval.
+    Revalidates the target immediately before invoking Argo Rollouts.
+    """
+
+    validation = validate_rollback_target(revision)
+
+    if not validation.get("success"):
+        return {
+            "success": False,
+            "executed": False,
+            "error": validation.get("error", "Rollback validation failed")
+        }
+
+    if (
+        expected_hash
+        and validation.get("target_hash") != expected_hash
+    ):
+        return {
+            "success": False,
+            "executed": False,
+            "error": "Stable revision changed after the approval request"
+        }
+
+    result = run_kubectl([
+        "argo", "rollouts", "undo",
+        ROLLOUT_NAME,
+        "--to-revision=" + str(revision),
+        "-n", NAMESPACE
+    ])
+
+    if not result["success"]:
+        return {
+            "success": False,
+            "executed": False,
+            "error": result.get("error", "Argo rollback command failed")
+        }
+
     return {
-        "success": False,
-        "error": "Rollback execution is disabled until human approval is implemented"
+        "success": True,
+        "executed": True,
+        "target_revision": revision,
+        "target_hash": validation["target_hash"],
+        "message": "Argo Rollouts accepted the rollback command",
+        "command_output": result.get("output", "")
     }

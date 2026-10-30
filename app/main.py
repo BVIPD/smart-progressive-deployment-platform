@@ -32,7 +32,8 @@ from deployment.database import (
 
 from deployment.argo_manager import (
     get_rollout_status,
-    validate_rollback_target
+    validate_rollback_target,
+    rollback_rollout
 )
 
 
@@ -526,21 +527,62 @@ def approve_rollback(data: RollbackReview):
             detail="Decision must be APPROVED or REJECTED"
         )
 
-    result = review_rollback_request(
+    # Retrieve the pending request before reviewing it.
+    pending_requests = get_rollback_requests("PENDING")
+
+    approval = next(
+        (
+            item for item in pending_requests
+            if item["request_id"] == data.request_id
+        ),
+        None
+    )
+
+    if approval is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pending rollback request not found or already reviewed"
+        )
+
+    # Record the human review decision.
+    review_result = review_rollback_request(
         request_id=data.request_id,
         decision=decision,
         reviewer=data.reviewer,
         note=data.note
     )
 
-    if not result["success"]:
+    if not review_result["success"]:
         raise HTTPException(
             status_code=400,
-            detail=result["error"]
+            detail=review_result["error"]
         )
 
+    # A rejection is recorded but never executes a rollback.
+    if decision == "REJECTED":
+        return {
+            "message": "Rollback request rejected",
+            "result": review_result,
+            "execution_performed": False
+        }
+
+    # Execute only after the approval has been recorded.
+    execution = rollback_rollout(
+        revision=int(approval["target_revision"]),
+        expected_hash=approval["target_hash"]
+    )
+
+    if not execution.get("success"):
+        return {
+            "message": "Approval recorded, but rollback execution failed",
+            "result": review_result,
+            "execution": execution,
+            "execution_performed": False
+        }
+
     return {
-        "message": "Rollback request reviewed",
-        "result": result,
-        "execution_performed": False
+        "message": "Rollback approved and command submitted to Argo Rollouts",
+        "result": review_result,
+        "execution": execution,
+        "execution_performed": True
     }
