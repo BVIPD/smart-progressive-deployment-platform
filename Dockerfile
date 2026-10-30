@@ -1,10 +1,19 @@
-
-FROM python:3.13-slim
+﻿FROM python:3.13-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+ARG KUBECTL_VERSION=v1.36.1
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    && curl -fsSLo /usr/local/bin/kubectl \
+    "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+    && chmod +x /usr/local/bin/kubectl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./app ./app
