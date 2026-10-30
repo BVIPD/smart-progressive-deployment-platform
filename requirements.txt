@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+psutil
+pandas
+scikit-learn
+joblib
+numpy
+prometheus-client

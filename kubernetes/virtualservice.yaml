@@ -1,0 +1,20 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ccrg-platform-vsvc
+spec:
+  hosts:
+    - ccrg-platform-service.default.svc.cluster.local
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: ccrg-platform-service.default.svc.cluster.local
+            port:
+              number: 8000
+          weight: 50
+        - destination:
+            host: ccrg-platform-canary-service.default.svc.cluster.local
+            port:
+              number: 8000
+          weight: 50

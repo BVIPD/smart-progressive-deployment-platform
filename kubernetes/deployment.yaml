@@ -1,0 +1,56 @@
+
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: ccrg-platform
+
+spec:
+  replicas: 5
+
+  selector:
+    matchLabels:
+      app: ccrg-platform
+
+  template:
+    metadata:
+      labels:
+        app: ccrg-platform
+    spec:
+      containers:
+        - name: ccrg-platform
+          image: ccrg-platform:v5
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_VERSION
+              value: "v5"
+
+  strategy:
+    canary:
+      stableService: ccrg-platform-service
+      canaryService: ccrg-platform-canary-service
+
+      trafficRouting:
+        istio:
+          virtualService:
+            name: ccrg-platform-vsvc
+            routes:
+              - primary
+
+      steps:
+        - setWeight: 20
+
+        - pause: {}
+
+        - analysis:
+            templates:
+              - templateName: ccrg-canary-availability
+
+        - pause: {}
+
+        - setWeight: 50
+
+        - pause: {}
+
+        - setWeight: 100

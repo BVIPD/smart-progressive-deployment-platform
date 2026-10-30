@@ -1,0 +1,297 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Progressive Deployment Platform</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: #101827;
+            color: white;
+            padding: 30px;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            color: #60a5fa;
+        }
+
+        .subtitle {
+            color: #9ca3af;
+            margin-bottom: 30px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            background: #1f2937;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #374151;
+        }
+
+        .card h3 {
+            color: #9ca3af;
+            margin-bottom: 15px;
+        }
+
+        .value {
+            font-size: 30px;
+            font-weight: bold;
+            overflow-wrap: anywhere;
+        }
+
+        .panel {
+            background: #1f2937;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 14px;
+            text-align: left;
+            border-bottom: 1px solid #374151;
+        }
+
+        th {
+            color: #60a5fa;
+        }
+
+        .success {
+            color: #4ade80;
+        }
+
+        .failure {
+            color: #f87171;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 7px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        #updated {
+            color: #9ca3af;
+            font-size: 13px;
+            margin-top: 15px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 15px;
+            }
+
+            .card {
+                padding: 18px;
+            }
+
+            .value {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Smart Progressive Deployment Platform</h1>
+    <p class="subtitle">AI-driven deployment monitoring dashboard</p>
+
+    <button onclick="loadDashboard()">Refresh Dashboard</button>
+
+    <div class="grid">
+
+        <div class="card">
+            <h3>CPU Usage</h3>
+            <div class="value" id="cpu">--</div>
+        </div>
+
+        <div class="card">
+            <h3>Memory Usage</h3>
+            <div class="value" id="memory">--</div>
+        </div>
+
+        <div class="card">
+            <h3>Active Version</h3>
+            <div class="value" id="version">--</div>
+        </div>
+
+        <div class="card">
+            <h3>Deployment Status</h3>
+            <div class="value" id="status">--</div>
+        </div>
+
+        <div class="card">
+            <h3>Success Probability</h3>
+            <div class="value" id="probability">--</div>
+        </div>
+
+    </div>
+
+    <div class="panel">
+        <h2>Deployment History</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Time</th>
+                    <th>Decision</th>
+                    <th>Active Version</th>
+                    <th>Status</th>
+                    <th>Probability</th>
+                </tr>
+            </thead>
+
+            <tbody id="history">
+                <tr>
+                    <td colspan="6">Loading deployment history...</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p id="updated">Waiting for data...</p>
+    </div>
+
+    <script>
+
+        async function loadDashboard() {
+
+            try {
+
+                const results = await Promise.all([
+                    fetch("/metrics"),
+                    fetch("/deployment/status"),
+                    fetch("/deployment/history")
+                ]);
+
+                if (results.some(response => !response.ok)) {
+                    throw new Error("API request failed");
+                }
+
+                const metrics = await results[0].json();
+                const status = await results[1].json();
+                const history = await results[2].json();
+
+                document.getElementById("cpu").textContent =
+                    Number(metrics.cpu_usage).toFixed(1) + "%";
+
+                document.getElementById("memory").textContent =
+                    Number(metrics.memory_usage).toFixed(1) + "%";
+
+                // Sort history by ID so the newest record is last.
+                const sortedHistory = history.slice().sort(
+                    (a, b) => Number(a.id || 0) - Number(b.id || 0)
+                );
+
+                const latest = sortedHistory.length
+                    ? sortedHistory[sortedHistory.length - 1]
+                    : null;
+
+                // Use the latest saved deployment record consistently.
+                document.getElementById("version").textContent =
+                    latest ? latest.active_version : status.active_version || "--";
+
+                document.getElementById("status").textContent =
+                    latest ? latest.deployment_status : status.deployment_status || "--";
+
+                document.getElementById("probability").textContent =
+                    latest
+                    ? (Number(latest.success_probability) * 100).toFixed(1) + "%"
+                    : "No data";
+
+                const table = document.getElementById("history");
+
+                if (!sortedHistory.length) {
+
+                    table.innerHTML =
+                        '<tr><td colspan="6">No deployment history available</td></tr>';
+
+                } else {
+
+                    table.innerHTML = sortedHistory.slice().reverse().map(item => {
+
+                        const decisionClass =
+                            item.decision === "CONTINUE" ? "success" : "failure";
+
+                        const probability =
+                            (Number(item.success_probability) * 100).toFixed(1);
+
+                        return `
+                            <tr>
+                                <td>${escapeHTML(item.id ?? "--")}</td>
+                                <td>${escapeHTML(item.time ?? "--")}</td>
+                                <td class="${decisionClass}">
+                                    ${escapeHTML(item.decision ?? "--")}
+                                </td>
+                                <td>${escapeHTML(item.active_version ?? "--")}</td>
+                                <td>${escapeHTML(item.deployment_status ?? "--")}</td>
+                                <td>${probability}%</td>
+                            </tr>
+                        `;
+
+                    }).join("");
+
+                }
+
+                document.getElementById("updated").textContent =
+                    "Last updated: " + new Date().toLocaleTimeString();
+
+            } catch (error) {
+
+                document.getElementById("updated").textContent =
+                    "Unable to load dashboard. Check whether the API is running.";
+
+                console.error(error);
+
+            }
+        }
+
+        function escapeHTML(value) {
+            return String(value).replace(/[&<>"']/g, character => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;"
+            })[character]);
+        }
+
+        loadDashboard();
+        setInterval(loadDashboard, 5000);
+
+    </script>
+
+</body>
+</html>

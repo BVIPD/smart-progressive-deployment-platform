@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  # Standalone Docker application
+  - job_name: "smart-progressive-platform-docker"
+    metrics_path: "/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          deployment_service: "docker"
+
+  # Kubernetes stable application
+  - job_name: "smart-progressive-platform-kubernetes-stable"
+    metrics_path: "/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8001"]
+        labels:
+          deployment_service: "kubernetes-stable"
+
+  # Kubernetes canary application
+  - job_name: "smart-progressive-platform-kubernetes-canary"
+    metrics_path: "/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8003"]
+        labels:
+          deployment_service: "kubernetes-canary"

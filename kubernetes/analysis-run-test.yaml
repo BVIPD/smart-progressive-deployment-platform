@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisRun
+metadata:
+  name: ccrg-canary-availability-test
+spec:
+  metrics:
+    - name: canary-availability
+      interval: 5s
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] >= 1
+      provider:
+        prometheus:
+          address: http://host.docker.internal:9090
+          query: |
+            up{
+              job="smart-progressive-platform-kubernetes-canary"
+            }
