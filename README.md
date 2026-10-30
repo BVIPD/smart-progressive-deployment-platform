@@ -448,14 +448,6 @@ Before production use:
 - Helm chart for one-command installation
 - Model monitoring and drift detection
 
----
-
-## 14. License
-
-*Specify a license here (for example MIT) and add a matching `LICENSE` file to the repository.*
-
----
-
 
 <div align="center">
 
