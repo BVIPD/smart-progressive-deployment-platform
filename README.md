@@ -1,4 +1,4 @@
-# Smart Progressive Deployment Platform
+﻿# Smart Progressive Deployment Platform
 
 An ML-driven progressive delivery platform that evaluates deployment stability using application metrics, integrates with Kubernetes and Argo Rollouts, and provides monitoring through Prometheus and Grafana.
 
@@ -327,6 +327,27 @@ This repository is an academic project and demonstration environment. Before pro
 
 Do not expose Prometheus, Grafana, or the API publicly without appropriate access controls.
 
+## Final verification — October 30, 2026
+
+The final local environment verification recorded:
+
+| Component | Verified result |
+|---|---|
+| Docker application | Healthy, version v2 |
+| Kubernetes stable service | Healthy, version v5 |
+| Kubernetes canary service | Healthy, version v5 |
+| Argo Rollouts | Healthy, Canary step 7/7 |
+| Kubernetes replicas | 5 desired, 5 ready, 5 available |
+| Prometheus | All 3 scrape targets UP |
+| Grafana | Healthy, version 13.2.4 |
+| Python syntax checks | Passed |
+| Automated tests | 26 passed, 0 failed |
+
+The Docker and Kubernetes version values refer to separate running deployments. The rollback approval workflow records human decisions but does not execute Kubernetes rollback.
+
+Detailed verification output is available in `evidence/final-verification.txt`.
+
 ## License
 
 This project includes the MIT License. See [LICENSE](LICENSE).
+
