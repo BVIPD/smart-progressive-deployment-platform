@@ -1,353 +1,497 @@
-﻿# Smart Progressive Deployment Platform
+﻿<div align="center">
 
-An ML-driven progressive delivery platform that evaluates deployment stability using application metrics, integrates with Kubernetes and Argo Rollouts, and provides monitoring through Prometheus and Grafana.
+# Smart Progressive Deployment Platform
 
-## Project overview
+### ML-Powered Canary Analysis with Human Approval and Rollback Support
 
-The platform combines a FastAPI application, a trained machine-learning model, deployment decision logic, Kubernetes rollout inspection, and monitoring endpoints. It evaluates CPU usage, memory usage, latency, error rate, and traffic to estimate deployment success and produce a deployment recommendation.
+*A final year capstone project on safer software releases through progressive delivery, observability, and machine-learning-assisted decision making.*
 
-The decision controller can return:
+<br>
 
-- **CONTINUE** — the model and available rollout information meet the configured continuation conditions.
-- **HOLD** — more monitoring is required or rollout status cannot be confirmed.
-- **ROLLBACK** — the model, configured metric limits, or rollout health indicates instability. This is a decision state, not proof that a Kubernetes rollback has been executed.
+![Python](https://img.shields.io/badge/Python-3.13+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?logo=scikitlearn&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white)
+![Argo Rollouts](https://img.shields.io/badge/Argo_Rollouts-EF7B4D)
+![Istio](https://img.shields.io/badge/Istio-466BB0?logo=istio&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-0A9EDC?logo=pytest&logoColor=white)
 
-The project includes a human-review workflow for rollback requests. At the current implementation stage, approving a request records the review in SQLite; it does **not** execute a Kubernetes rollback.
+[Overview](#1-overview) ·
+[Architecture](#3-system-architecture) ·
+[Quick Start](#8-getting-started) ·
+[API](#9-api-reference) ·
+[Results](#6-verification-and-results) ·
+[Limitations](#11-limitations-and-production-considerations)
 
-## Main features
+</div>
 
-- FastAPI service with interactive API documentation.
-- ML prediction endpoint backed by a trained scikit-learn model.
-- Deployment evaluation using CPU, memory, latency, error rate, and traffic inputs.
-- Configurable CONTINUE / HOLD / ROLLBACK decision thresholds.
-- Argo Rollouts status and revision inventory integration.
-- Dry-run deployment evaluation that reports proposed actions without executing them.
-- SQLite deployment history and rollback approval records.
-- Prometheus metrics endpoint and scrape configuration for Docker, Kubernetes stable, and Kubernetes canary services.
-- Grafana monitoring dashboard.
-- Browser-based deployment dashboard showing system metrics, deployment status, success probability, and deployment history.
-- Automated tests for API, controller, rollback API, and rollback database behavior.
+---
 
-## Architecture
+## Project Information
 
-```text
-                    +-----------------------------+
-                    |       Browser Dashboard     |
-                    |       /dashboard            |
-                    +--------------+--------------+
-                                   |
-                                   v
-+------------------+     +---------+----------+      +-------------------+
-| Metrics / Inputs |---->|       FastAPI      |----->| ML Model          |
-| CPU, memory,     |     | /predict           |      | deployment_model  |
-| latency, errors, |     | /deployment/evaluate|     | .pkl              |
-| traffic          |     | /deployment/dry-run |     +-------------------+
-+------------------+     +---------+----------+
-                                   |
-                                   v
-                         +---------+----------+
-                         | Deployment         |
-                         | Controller         |
-                         | CONTINUE / HOLD /  |
-                         | ROLLBACK decision  |
-                         +---------+----------+
-                                   |
-                    +--------------+---------------+
-                    |                              |
-                    v                              v
-          +---------------------+       +----------------------+
-          | Argo Rollouts       |       | SQLite               |
-          | status/revisions    |       | deployment history   |
-          | target validation   |       | rollback reviews     |
-          +---------------------+       +----------------------+
+| | |
+|---|---|
+| **Project title** | Smart Progressive Deployment Platform |
+| **Project type** | Final Year Capstone Project |
+| **Team** | BVIPD Project Team |
+| **Institution** | *Your institution name* |
+| **Department / Program** | *Your department and program* |
+| **Supervisor** | *Supervisor name* |
+| **Academic year** | *e.g. 2025 – 2026* |
+| **Repository** | https://github.com/BVIPD/smart-progressive-deployment-platform |
 
-       Prometheus scrapes Docker, Kubernetes stable and canary
-                              |
-                              v
-                         +---------+
-                         | Grafana |
-                         +---------+
+---
+
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [Objectives and Key Features](#2-objectives-and-key-features)
+3. [System Architecture](#3-system-architecture)
+4. [Methodology](#4-methodology)
+5. [Component Walkthrough](#5-component-walkthrough)
+6. [Verification and Results](#6-verification-and-results)
+7. [Technology Stack and Repository Structure](#7-technology-stack-and-repository-structure)
+8. [Getting Started](#8-getting-started)
+9. [API Reference](#9-api-reference)
+10. [Testing](#10-testing)
+11. [Limitations and Production Considerations](#11-limitations-and-production-considerations)
+12. [Future Work](#12-future-work)
+13. [Authors and Acknowledgements](#13-authors-and-acknowledgements)
+14. [License](#14-license)
+
+---
+
+## 1. Overview
+
+### Problem statement
+
+Releasing a new application version is risky. Manual judgment about whether a canary release is healthy is slow, subjective, and difficult to audit, and a bad release that reaches all users can cause outages. Threshold-only checks on single metrics also miss combined patterns, such as modest increases in latency, CPU, and error rate that are only concerning together.
+
+### Proposed solution
+
+This project is a progressive-delivery platform that evaluates a release while it is being rolled out. It collects application and deployment metrics (CPU, memory, latency, error rate, and traffic), passes them to a trained machine-learning model that estimates the **probability of deployment success**, and produces one of three recommendations: `CONTINUE`, `HOLD`, or `ROLLBACK`.
+
+Rollback requests are validated and routed through a **human-review workflow** rather than executed automatically, keeping a person accountable for the final decision.
+
+Kubernetes, Argo Rollouts, and Istio provide rollout orchestration and traffic control. Prometheus and Grafana provide monitoring.
+
+---
+
+## 2. Objectives and Key Features
+
+### Objectives
+
+- Automate canary health evaluation using a data-driven model instead of manual inspection.
+- Integrate with standard cloud-native tooling (Kubernetes, Argo Rollouts, Istio) rather than a bespoke deployment system.
+- Provide full observability of both the application and the decision process.
+- Keep a human in the loop for any rollback action.
+- Persist every evaluation so deployment decisions can be audited.
+
+### Key features
+
+| Capability | Description |
+|---|---|
+| ML-based evaluation | Predicts deployment success from CPU, memory, latency, error rate, and traffic |
+| Progressive delivery | Manages canary releases with Argo Rollouts |
+| Traffic management | Splits traffic between stable and canary services through an Istio `VirtualService` |
+| Observability | Exposes Prometheus metrics, visualized in Grafana |
+| API and dashboard | FastAPI endpoints with Swagger documentation and a browser-based dashboard |
+| Rollback safeguards | Validates rollback requests and supports a human-review workflow |
+| Dry-run mode | Evaluates a proposed action without executing it |
+| Decision history | Stores evaluations and decisions in SQLite for auditing |
+
+---
+
+## 3. System Architecture
+
+The diagram shows the overall flow from code change through image build, canary rollout, monitoring, ML evaluation, and the resulting deployment decision.
+
+<p align="center">
+  <img src="docs/Smart%20Progressive%20Deployment%20Architecture.png" alt="Smart Progressive Deployment Platform architecture" width="100%">
+</p>
+
+### Decision flow
+
+```mermaid
+flowchart LR
+    A[Code push] --> B[GitHub Actions<br/>build and publish image]
+    B --> C[Argo Rollouts<br/>canary release]
+    C --> D[Istio<br/>stable / canary traffic split]
+    D --> E[Prometheus<br/>metric collection]
+    E --> F[ML model<br/>success probability]
+    F --> G{Controller decision}
+    G -->|"≥ 0.85"| H[CONTINUE]
+    G -->|"0.60 to 0.85"| I[HOLD]
+    G -->|"< 0.60"| J[ROLLBACK recommended]
+    J --> K[Validation and<br/>human review]
 ```
 
-## Technology stack
+---
 
-| Layer | Technology |
+## 4. Methodology
+
+### 4.1 Workflow
+
+1. **Code change.** A developer updates the application and pushes the source code.
+2. **Build.** GitHub Actions can build and publish the Docker image as part of the CI/CD workflow.
+3. **Canary release.** Kubernetes and Argo Rollouts manage the progressive deployment.
+4. **Traffic routing.** Istio directs traffic between the stable and canary services.
+5. **Metric collection.** Prometheus collects live application and deployment metrics.
+6. **ML evaluation.** The model estimates deployment success probability from the metric inputs.
+7. **Decision.** The controller recommends continuing, holding for more observation, or rolling back. Rollback requests are subject to validation and human review.
+
+### 4.2 Machine-learning component
+
+- **Input features:** CPU usage, memory usage, latency, error rate, and traffic.
+- **Output:** probability that the deployment is successful.
+- **Training data:** a synthetic dataset produced by `dataset/generate_dataset.py` and stored in `dataset/deployment_metrics.csv`.
+- **Training pipeline:** `ml/train_model.py` (scikit-learn); the trained model is serialized with joblib to `ml/deployment_model.pkl`.
+
+### 4.3 Decision thresholds
+
+| Prediction / condition | Recommendation |
 |---|---|
-| API and dashboard backend | Python, FastAPI, Uvicorn |
+| Success probability **≥ 0.85** and configured health checks pass | `CONTINUE` |
+| Success probability **0.60 to below 0.85** | `HOLD` |
+| Success probability **below 0.60**, or configured failure conditions met | `ROLLBACK` recommendation |
+
+> **Note:** These thresholds are configured for demonstration and are not universal production values. The controller also considers configured metric limits and rollout health.
+
+---
+
+## 5. Component Walkthrough
+
+### 5.1 FastAPI backend
+
+Exposes prediction, health, deployment evaluation, rollout status, history, and rollback-review endpoints.
+
+<p align="center">
+  <img src="docs/fastapi.png" alt="FastAPI application and API documentation" width="85%">
+</p>
+
+### 5.2 Deployment dashboard
+
+Presents deployment status, system metrics, prediction results, and deployment history in one place.
+
+<p align="center">
+  <img src="docs/dashboard.png" alt="Smart Progressive Deployment dashboard" width="90%">
+</p>
+
+### 5.3 Argo Rollouts
+
+Manages the canary rollout. In the demonstration, the main rollout progressed through all configured stages and reached 100% traffic on the stable v5 release.
+
+<p align="center">
+  <img src="docs/argo%20rollouts.png" alt="Argo Rollouts canary deployment" width="90%">
+</p>
+
+### 5.4 Istio traffic splitting
+
+Routes requests between the stable and canary services according to the configured `VirtualService` and rollout traffic weights.
+
+<p align="center">
+  <img src="docs/traffic%20split.png" alt="Istio traffic split between stable and canary services" width="90%">
+</p>
+
+### 5.5 Prometheus
+
+Scrapes application metrics from the Docker, Kubernetes stable, and Kubernetes canary targets. The application exposes metrics at `/prometheus`.
+
+<p align="center">
+  <img src="docs/prometheus.png" alt="Prometheus metrics and targets" width="90%">
+</p>
+
+### 5.6 Grafana
+
+Visualizes availability, CPU and memory usage, request activity, application health, and ML deployment success probability.
+
+<p align="center">
+  <img src="docs/grafana.png" alt="Grafana monitoring dashboard" width="90%">
+</p>
+
+---
+
+## 6. Verification and Results
+
+Results observed during the project demonstration:
+
+| Test / component | Observed result |
+|---|---|
+| Main Argo Rollout | Healthy, step 7/7 |
+| Main deployment replicas | 5 desired, 5 ready, 5 available |
+| Canary ML positive `AnalysisRun` | Successful at probability `1.0` |
+| Canary ML negative `AnalysisRun` | Failed as expected at probability `0.79`, below the `0.85` threshold |
+| Isolated Argo rollback test | Rolled back from v5 to v2; test rollout returned to Healthy |
+| Git repository | Changes pushed to `main`; working tree clean at final verification |
+
+> **Scope of the rollback test.** The actual Argo rollback was executed in the isolated `rollback-lab` namespace using a separate `rollback-demo` rollout. The main five-replica deployment was not rolled back. This verifies the Argo rollback mechanism. It is not evidence that the complete FastAPI human-approval-to-rollback path was tested end to end.
+
+Raw outputs are available in [`evidence/`](evidence/).
+
+---
+
+## 7. Technology Stack and Repository Structure
+
+### Technology stack
+
+| Layer | Technologies |
+|---|---|
+| Backend and API | Python, FastAPI, Uvicorn |
 | Machine learning | scikit-learn, pandas, NumPy, joblib |
-| System metrics | psutil |
+| System metrics | psutil, Prometheus client |
 | Containerization | Docker |
 | Orchestration | Kubernetes |
 | Progressive delivery | Argo Rollouts |
 | Traffic management | Istio |
-| Metrics collection | Prometheus |
-| Monitoring visualization | Grafana |
+| Monitoring | Prometheus, Grafana |
 | Persistence | SQLite |
 | Testing | pytest, FastAPI TestClient |
+| Source control and CI | Git, GitHub, GitHub Actions |
 
-## Repository structure
+### Repository structure
 
 ```text
 CCRG_PR1/
 ├── app/
-│   ├── main.py
-│   ├── dashboard.html
-│   └── __init__.py
+│   ├── main.py                    # FastAPI application
+│   └── dashboard.html             # Browser dashboard
+├── backups/
+├── data/
 ├── dataset/
-│   ├── deployment_metrics.csv
+│   ├── deployment_metrics.csv     # Generated synthetic dataset
 │   └── generate_dataset.py
 ├── deployment/
-│   ├── argo_manager.py
-│   ├── controller.py
-│   └── database.py
-├── evidence/
-│   ├── analysis-runs.txt
+│   ├── argo_manager.py            # Argo Rollouts integration
+│   ├── controller.py              # Decision logic
+│   └── database.py                # SQLite persistence
+├── docs/                          # Screenshots and architecture diagram
+├── evidence/                      # Captured test outputs
+│   ├── actual-rollback-test.txt
+│   ├── ml-canary-pass-test.txt
+│   ├── ml-canary-fail-test.txt
 │   ├── final-pods.txt
-│   ├── final-rollout.txt
-│   └── final-virtualservice.yaml
+│   └── final-rollout.txt
 ├── kubernetes/
+│   ├── analysis-run-ml-test.yaml
 │   ├── analysis-run-test.yaml
 │   ├── analysis-template.yaml
 │   ├── deployment.yaml
+│   ├── rollback-demo.yaml
 │   ├── service.yaml
 │   └── virtualservice.yaml
 ├── ml/
-│   ├── deployment_model.pkl
+│   ├── deployment_model.pkl       # Trained model
 │   └── train_model.py
 ├── monitoring/
 │   └── prometheus.yml
 ├── tests/
-│   ├── test_api.py
-│   ├── test_controller.py
-│   ├── test_rollback_api.py
-│   └── test_rollback_database.py
-├── .dockerignore
-├── .gitignore
 ├── Dockerfile
-├── LICENSE
-└── requirements.txt
+├── requirements.txt
+└── README.md
 ```
 
-## Prerequisites
+---
 
-Install or configure:
+## 8. Getting Started
 
-- Python 3.13 or a compatible Python version for the Docker image.
-- Docker Desktop.
-- Kubernetes enabled in Docker Desktop, or another Kubernetes cluster.
-- `kubectl`.
-- Argo Rollouts controller and the `kubectl-argo-rollouts` plugin.
-- Istio when using the included Istio traffic-routing configuration.
-- Prometheus and Grafana for monitoring.
+### Prerequisites
 
-The Kubernetes resources and service names in the included configuration are project-specific. Review namespace, image names, ports, and cluster context before applying manifests to another environment.
+- Python 3.13 or a compatible version
+- Docker Desktop
+- A Kubernetes cluster (Docker Desktop Kubernetes is suitable for local development)
+- `kubectl`
+- Argo Rollouts controller and the `kubectl-argo-rollouts` plugin
+- Istio, when using the included traffic-routing configuration
+- Prometheus and Grafana for monitoring
 
-## Run the FastAPI application locally
+### Step 1: Clone the repository
 
-From the project root:
+```bash
+git clone https://github.com/BVIPD/smart-progressive-deployment-platform.git
+cd smart-progressive-deployment-platform
+```
+
+### Step 2: Create the Python environment
+
+<details open>
+<summary><b>Windows (PowerShell)</b></summary>
 
 ```powershell
-cd C:\CCRG_PR1
-
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-
-uvicorn app.main:app --host 127.0.0.1 --port 8002 --reload
 ```
 
-Open:
+</details>
 
-- Dashboard: http://127.0.0.1:8002/dashboard
-- API documentation: http://127.0.0.1:8002/docs
-- Health: http://127.0.0.1:8002/health
-- Prometheus exposition: http://127.0.0.1:8002/prometheus
+<details>
+<summary><b>Linux / macOS</b></summary>
 
-The application expects the trained model at `ml/deployment_model.pkl`.
-
-## Build and run with Docker
-
-Build the image:
-
-```powershell
-docker build -t ccrg-platform:v1 .
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-Run the container:
+</details>
 
-```powershell
-docker run -d --name ccrg-platform-local -p 8000:8000 ccrg-platform:v1
-```
+### Step 3: Generate data and train the model
 
-Check the service:
+Skip this step if `ml/deployment_model.pkl` already exists.
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
-```
-
-If the container name or host port is already in use, choose a different container name or host port.
-
-## Machine-learning workflow
-
-The dataset is stored in `dataset/deployment_metrics.csv`. The dataset generation script is `dataset/generate_dataset.py`, and model training is implemented in `ml/train_model.py`.
-
-Generate the dataset when required:
-
-```powershell
+```bash
 python dataset/generate_dataset.py
-```
-
-Train the model:
-
-```powershell
 python ml/train_model.py
 ```
 
-The trained model is stored as `ml/deployment_model.pkl`.
+The dataset is written to `dataset/deployment_metrics.csv` and the trained model to `ml/deployment_model.pkl`. The application expects the model at that path.
 
-The model predicts deployment success from the metric features used during training. The deployment controller combines the prediction and probability with metric thresholds and Argo Rollouts status to produce a decision. A prediction is an estimate, not a guarantee of deployment safety.
+### Step 4: Run the FastAPI application
 
-## API endpoints
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/` | Root endpoint |
-| GET | `/dashboard` | Browser monitoring dashboard |
-| GET | `/health` | Application health |
-| GET | `/version` | Application version |
-| GET | `/metrics` | Application/system metrics in JSON |
-| GET | `/prometheus` | Prometheus exposition format |
-| POST | `/predict` | ML deployment prediction |
-| POST | `/deployment/evaluate` | Evaluate deployment and record decision |
-| POST | `/deployment/dry-run` | Evaluate a proposed action without executing it |
-| GET | `/deployment/status` | Controller deployment status |
-| GET | `/deployment/history` | Recorded deployment history |
-| GET | `/argo/status` | Argo Rollouts status |
-| POST | `/deployment/rollback/request` | Validate target and create approval request |
-| GET | `/deployment/rollback/pending` | List pending rollback requests |
-| POST | `/deployment/rollback/approve` | Record approval or rejection |
-
-See `/docs` for the request and response schemas.
-
-## Deployment decisions
-
-The controller uses configured limits and probability thresholds. The current controller configuration is:
-
-| Metric / threshold | Value |
-|---|---:|
-| CPU usage limit | 95% |
-| Memory usage limit | 95% |
-| Latency limit | 2000 ms |
-| Error rate limit | 5% |
-| Continue probability threshold | 0.85 |
-| Rollback probability threshold | 0.60 |
-
-These are project configuration values, not universal production thresholds. They should be calibrated for the application and workload before production use.
-
-The dry-run endpoint explicitly reports that no deployment action was executed. The evaluation endpoint records the decision and checks Argo status; it does not itself prove that traffic was promoted or rolled back.
-
-## Kubernetes and Argo Rollouts
-
-The `kubernetes/` directory contains the deployment, service, analysis template, test analysis run, and Istio VirtualService manifests.
-
-Inspect the rollout:
-
-```powershell
-kubectl-argo-rollouts get rollout ccrg-platform -n default
+```bash
+uvicorn app.main:app --host 127.0.0.1 --port 8002 --reload
 ```
 
-Inspect pods:
+| Service | URL |
+|---|---|
+| Dashboard | http://127.0.0.1:8002/dashboard |
+| Swagger API documentation | http://127.0.0.1:8002/docs |
+| Health check | http://127.0.0.1:8002/health |
+| Prometheus metrics | http://127.0.0.1:8002/prometheus |
+
+### Step 5: Build and run with Docker
+
+```bash
+docker build -t ccrg-platform:v1 .
+docker run -d --name ccrg-platform-local -p 8000:8000 ccrg-platform:v1
+```
+
+Verify the container:
 
 ```powershell
+# PowerShell
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+```bash
+# Linux / macOS
+curl http://127.0.0.1:8000/health
+```
+
+If the container name or port is already in use, choose a different name or host port.
+
+### Step 6: Inspect the Kubernetes rollout
+
+After configuring the cluster and the required Argo and Istio components:
+
+```bash
+kubectl get nodes
+kubectl argo rollouts get rollout ccrg-platform -n default
 kubectl get pods -n default
 ```
 
-Review the manifests and current cluster context before applying any resource changes. Do not apply a new rollout or trigger a rollback merely to test the API.
+Review the manifests, namespace, image names, ports, and your current Kubernetes context before applying resources to any cluster.
 
-### Rollback workflow limitation
+---
 
-The current rollback workflow supports target inspection/validation, request creation, pending-request listing, and approval/rejection recording. The `rollback_rollout()` function is intentionally disabled, and the approval API returns `execution_performed: false`.
+## 9. API Reference
 
-Therefore, **actual Kubernetes rollback execution after approval is not implemented in this repository version**. The platform should be described as providing rollback decision support and a human-reviewed approval record, not as automatically executing rollback.
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/` | Root endpoint |
+| `GET` | `/dashboard` | Browser dashboard |
+| `GET` | `/health` | Application health |
+| `GET` | `/version` | Application version |
+| `GET` | `/metrics` | JSON system and application metrics |
+| `GET` | `/prometheus` | Prometheus exposition format |
+| `POST` | `/predict` | ML deployment prediction |
+| `POST` | `/deployment/evaluate` | Evaluate and record a deployment decision |
+| `POST` | `/deployment/dry-run` | Evaluate a proposed action without executing it |
+| `GET` | `/deployment/status` | Controller deployment status |
+| `GET` | `/deployment/history` | Deployment decision history |
+| `GET` | `/argo/status` | Argo Rollouts status |
+| `POST` | `/deployment/rollback/request` | Validate and create a rollback request |
+| `GET` | `/deployment/rollback/pending` | List pending rollback requests |
+| `POST` | `/deployment/rollback/approve` | Review a pending rollback request |
 
-## Prometheus and Grafana
+For full request and response schemas, open the Swagger UI at `/docs`.
 
-Prometheus scrape configuration is in `monitoring/prometheus.yml`. It defines three targets:
+---
 
-- Docker application: `host.docker.internal:8000`
-- Kubernetes stable service: `host.docker.internal:8001`
-- Kubernetes canary service: `host.docker.internal:8003`
+## 10. Testing
 
-The scrape path is `/prometheus`, with a configured scrape interval of five seconds.
+Run the automated test suite:
 
-Useful local addresses in the demonstrated environment:
-
-- Prometheus: http://127.0.0.1:9090
-- Prometheus targets: http://127.0.0.1:9090/targets
-- Grafana: http://127.0.0.1:3000
-
-The Grafana dashboard used in the demonstrated environment is titled **Smart Progressive Deployment Monitoring**. Its visible panels include application availability, CPU/memory usage, HTTP request rate, application health, and ML deployment success probability.
-
-Prometheus target health `UP` confirms successful metric scraping; it does not independently guarantee application-level correctness. The application latency metric is an observed average, not a p95 latency measurement. The traffic metric is a cumulative request count, not requests per second.
-
-## Tests
-
-Run the test suite from the project root:
-
-```powershell
+```bash
 python -m pytest tests -q
 ```
 
-The verified project test run completed with **26 passed**. Three non-failing warnings were reported: a Starlette/httpx deprecation warning and scikit-learn feature-name warnings.
+Run a syntax check on the core modules:
 
-Run syntax checks:
-
-```powershell
+```bash
 python -m py_compile app/main.py deployment/controller.py deployment/argo_manager.py deployment/database.py
 ```
 
-## Verified environment snapshot
+---
 
-The following were verified in the demonstrated local environment during project validation:
+## 11. Limitations and Production Considerations
 
-- FastAPI dashboard returned HTTP 200.
-- Application health endpoint returned `healthy`.
-- Argo Rollouts reported `Healthy`, step 7/7, with five desired and five ready replicas.
-- Prometheus reported all three configured scrape targets as `UP`.
-- Grafana health endpoint returned HTTP 200.
-- The test suite reported 26 passed.
+This is an academic project and a local demonstration environment. ML predictions are estimates that depend on the quality and representativeness of the training data. The demonstration dataset is synthetic, so reported test performance should not be interpreted as production reliability.
 
-These are environment-specific verification results, not a guarantee that a fresh installation will have the same cluster state.
+Before production use:
 
-## Safety and production considerations
+- [ ] Add authentication and authorization
+- [ ] Secure reviewer identity for rollback approvals
+- [ ] Protect secrets
+- [ ] Validate rollback targets against an explicit known-good revision policy
+- [ ] Add concurrency safeguards
+- [ ] Test the full approval-to-execution workflow end to end
+- [ ] Calibrate model thresholds using representative workload data
+- [ ] Do not expose the API, Prometheus, or Grafana publicly without suitable access controls
 
-This repository is an academic project and demonstration environment. Before production use, add appropriate authentication and authorization, secure reviewer identity, protect secrets, validate rollback targets against an explicit known-good revision policy, add concurrency safeguards, and test rollback execution in an isolated cluster. Review metric thresholds and model performance against representative production data.
+---
 
-Do not expose Prometheus, Grafana, or the API publicly without appropriate access controls.
+## 12. Future Work
 
-## Final verification — October 30, 2026
+- End-to-end test of the FastAPI approval-to-Argo-rollback path
+- Training and validation on real workload telemetry
+- Role-based access control for reviewers
+- Notifications (Slack or email) for pending rollback requests
+- Helm chart for one-command installation
+- Model monitoring and drift detection
 
-The final local environment verification recorded:
+---
 
-| Component | Verified result |
-|---|---|
-| Docker application | Healthy, version v2 |
-| Kubernetes stable service | Healthy, version v5 |
-| Kubernetes canary service | Healthy, version v5 |
-| Argo Rollouts | Healthy, Canary step 7/7 |
-| Kubernetes replicas | 5 desired, 5 ready, 5 available |
-| Prometheus | All 3 scrape targets UP |
-| Grafana | Healthy, version 13.2.4 |
-| Python syntax checks | Passed |
-| Automated tests | 26 passed, 0 failed |
+## 13. Authors and Acknowledgements
 
-The Docker and Kubernetes version values refer to separate running deployments. The rollback approval workflow records human decisions but does not execute Kubernetes rollback.
+**BVIPD Project Team**
 
-Detailed verification output is available in `evidence/final-verification.txt`.
+| Name | Role | Contact |
+|---|---|---|
+| *Member name* | *e.g. Backend and ML* | *GitHub / email* |
+| *Member name* | *e.g. DevOps and Kubernetes* | *GitHub / email* |
+| *Member name* | *e.g. Monitoring and testing* | *GitHub / email* |
 
-## License
+**Supervisor:** *Supervisor name, designation*
 
-This project includes the MIT License. See [LICENSE](LICENSE).
+**Acknowledgements:** We thank our supervisor, our department, and the open-source communities behind FastAPI, Kubernetes, Argo Rollouts, Istio, Prometheus, Grafana, and scikit-learn.
 
+---
+
+## 14. License
+
+*Specify a license here (for example MIT) and add a matching `LICENSE` file to the repository.*
+
+---
+
+<div align="center">
+
+**Smart Progressive Deployment Platform**
+*Safer releases through progressive delivery, observability, and ML-assisted decisions.*
+
+</div>
