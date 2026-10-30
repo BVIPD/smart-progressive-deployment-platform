@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollback-demo
+  namespace: rollback-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rollback-demo
+  template:
+    metadata:
+      labels:
+        app: rollback-demo
+    spec:
+      containers:
+        - name: app
+          image: ccrg-platform:v2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_VERSION
+              value: "v2"
+  strategy:
+    canary:
+      steps:
+        - setWeight: 100
